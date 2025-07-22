@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Local File Manager</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Inter font use kiya */
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .current-path {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 20px;
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .controls {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
+        .go-up-button {
+            padding: 10px 20px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .go-up-button:hover {
+            background-color: #5a6268;
+            transform: translateY(-2px);
+        }
+        .media-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* Grid item size badhaya gaya */
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            padding: 10px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+        .media-item {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            text-align: center;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer; /* Clickable items ke liye pointer */
+        }
+        .media-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .media-item img, .media-item video {
+            max-width: 100%;
+            height: 180px; /* Thumbnails ke liye height badhayi gayi */
+            object-fit: contain;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+        }
+        .media-item .icon {
+            font-size: 4em; /* Icon size */
+            margin-bottom: 10px;
+            color: #007bff;
+        }
+        .media-item.folder .icon {
+            color: #ffc107; /* Folder icon color */
+        }
+        .media-item.file .icon {
+            color: #6f42c1; /* Generic file icon color */
+        }
+        .media-item p {
+            font-weight: bold;
+            margin: 0;
+            color: #444;
+            word-wrap: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%; /* Text ko item ke andar wrap karne ke liye */
+            padding: 0 5px;
+        }
+        /* 'View Original' button yahan se hata diya gaya hai */
+
+        /* Full View Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000; /* Higher z-index */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Scroll hata diya */
+            background-color: rgba(0,0,0,0.95); /* Darker overlay */
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px); /* Blur effect */
+            flex-direction: column; /* Buttons ko bottom par rakhne ke liye */
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 95%; /* Max-width badhayi gayi */
+            max-height: 95%; /* Max-height badhayi gayi */
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            flex-grow: 1; /* Content ko available space lene dein */
+        }
+        #caption {
+            margin: auto;
+            display: block;
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
+            color: #eee; /* Caption ke liye halka text */
+            padding: 15px 0;
+            font-size: 1.1em;
+            flex-shrink: 0; /* Caption ko shrink hone se rokein */
+        }
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: #fff; /* White close button */
+            font-size: 50px; /* Bada close button */
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .close:hover,
+        .close:focus {
+            color: #ccc;
+        }
+
+        .modal-controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 10px;
+            box-sizing: border-box;
+            z-index: 1001; /* Buttons ko content ke upar rakhein */
+        }
+        .modal-btn {
+            background-color: rgba(0, 123, 255, 0.7); /* Thoda transparent blue */
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 50px; /* Gol buttons */
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .modal-btn:hover {
+            background-color: rgba(0, 123, 255, 1);
+            transform: translateY(-2px);
+        }
+        .modal-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .modal-btn.autoplay-active {
+            background-color: rgba(40, 167, 69, 0.7); /* Green when active */
+        }
+        .modal-btn.autoplay-active:hover {
+            background-color: rgba(40, 167, 69, 1);
+        }
+
+        /* Font Awesome for Icons */
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css');
+        /* Inter Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .media-container {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Mobile par chhote grid items */
+                gap: 15px;
+            }
+            .media-item img, .media-item video {
+                height: 120px; /* Mobile par chhote thumbnails */
+            }
+            h1 {
+                font-size: 2em;
+            }
+            .current-path {
+                font-size: 1em;
+                padding: 8px 12px;
+            }
+            .go-up-button {
+                padding: 8px 15px;
+                font-size: 0.9em;
+            }
+            .media-item p {
+                font-size: 0.9em;
+            }
+            .close {
+                font-size: 40px;
+                top: 10px;
+                right: 20px;
+            }
+            /* Mobile par modal content ko full screen karein */
+            .modal-content {
+                max-width: 100vw; /* Viewport ki poori width */
+                max-height: 100vh; /* Viewport ki poori height */
+                width: 100vw; /* Zaroori hai ki poori width le */
+                height: 100vh; /* Zaroori hai ki poori height le */
+                border-radius: 0; /* Corner radius hata dein */
+                box-shadow: none; /* Shadow hata dein */
+            }
+            #caption {
+                font-size: 0.9em;
+                padding: 5px 0;
+                position: absolute; /* Caption ko bottom par rakhein */
+                bottom: 0;
+                width: 100%;
+                background-color: rgba(0,0,0,0.5); /* Caption ke liye semi-transparent background */
+            }
+            .close {
+                font-size: 40px;
+                top: 10px;
+                right: 15px;
+            }
+            .modal-controls {
+                flex-direction: row; /* Buttons ko row mein rakhein */
+                gap: 10px;
+                bottom: 10px;
+            }
+            .modal-btn {
+                padding: 10px 15px;
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Local File Manager</h1>
+    <div class="current-path">
+        Current Path: <strong>/{{ current_path if current_path else '' }}</strong>
+    </div>
+
+    <div class="controls">
+        {% if not is_root %}
+        <a href="/{{ encoded_parent_path }}" class="go-up-button">
+            <i class="fas fa-arrow-up"></i> Go Up
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="media-container">
+        {% for item in items %}
+        <div class="media-item {% if item.type == 'folder' %}folder{% elif item.type == 'file' %}file{% endif %}"
+             data-type="{{ item.type }}"
+             data-src="/media_file/{{ item.encoded_path }}"
+             data-name="{{ item.name }}"
+             onclick="{% if item.type == 'folder' %}window.location.href='/{{ item.encoded_path }}'{% elif item.type == 'image' or item.type == 'video' %}openModalWithIndex(this){% else %}alert('Cannot preview this file type directly.'){% endif %}">
+            {% if item.type == 'folder' %}
+            <i class="fas fa-folder icon"></i>
+            {% elif item.type == 'image' %}
+            <img src="/media_file/{{ item.encoded_path }}" alt="{{ item.name }}">
+            {% elif item.type == 'video' %}
+            <video preload="metadata" src="/media_file/{{ item.encoded_path }}#t=0.1"></video> <!-- #t=0.1 for thumbnail -->
+            {% else %}
+            <i class="fas fa-file icon"></i>
+            {% endif %}
+            <p>{{ item.name }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div class="modal-content-wrapper">
+            <img class="modal-content" id="img01" style="display: none;">
+            <video class="modal-content" id="vid01" controls style="display: none;"></video>
+        </div>
+        <div id="caption"></div>
+
+        <div class="modal-controls">
+            <button class="modal-btn" onclick="showPrevMedia()">
+                <i class="fas fa-arrow-left"></i> Previous
+            </button>
+            <button class="modal-btn" id="autoplayBtn" onclick="toggleAutoplay()">
+                <i class="fas fa-play"></i> Autoplay
+            </button>
+            <button class="modal-btn" onclick="showNextMedia()">
+                Next <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Modal elements
+        var modal = document.getElementById("myModal");
+        var modalImg = document.getElementById("img01");
+        var modalVideo = document.getElementById("vid01");
+        var captionText = document.getElementById("caption");
+        var autoplayBtn = document.getElementById("autoplayBtn");
+
+        // Media items array aur current index
+        let playableMediaItems = []; // Sirf images aur videos
+        let currentMediaIndex = 0;
+        let autoplayInterval;
+        const AUTOPLAY_DELAY = 3000; // 3 seconds
+
+        // DOMContentLoaded par playable media items ko collect karein
+        document.addEventListener('DOMContentLoaded', function() {
+            const allMediaItems = document.querySelectorAll('.media-item');
+            allMediaItems.forEach((item, index) => {
+                const type = item.dataset.type;
+                if (type === 'image' || type === 'video') {
+                    playableMediaItems.push({
+                        src: item.dataset.src,
+                        name: item.dataset.name,
+                        type: type,
+                        originalIndex: index // Original index for reference
+                    });
+                }
+            });
+
+            // Video thumbnails ke liye: preload metadata aur time ko 0.1s par set karein
+            const videos = document.querySelectorAll('video[preload="metadata"]');
+            videos.forEach(video => {
+                video.addEventListener('loadedmetadata', function() {
+                    video.currentTime = 0.1;
+                });
+            });
+        });
+
+        function openModalWithIndex(clickedElement) {
+            const clickedSrc = clickedElement.dataset.src;
+            const clickedType = clickedElement.dataset.type;
+
+            // Find the index of the clicked item in our playableMediaItems array
+            currentMediaIndex = playableMediaItems.findIndex(item => item.src === clickedSrc && item.type === clickedType);
+
+            if (currentMediaIndex !== -1) {
+                showMedia(playableMediaItems[currentMediaIndex]);
+                modal.style.display = "flex";
+                startAutoplay(); // Modal khulte hi autoplay shuru karein
+            } else {
+                alert('Media item not found in playable list.');
+            }
+        }
+
+        function showMedia(mediaItem) {
+            captionText.innerHTML = mediaItem.name;
+
+            if (mediaItem.type === 'image') {
+                modalImg.src = mediaItem.src;
+                modalImg.style.display = "block";
+                modalVideo.style.display = "none";
+                modalVideo.pause();
+            } else if (mediaItem.type === 'video') {
+                modalVideo.src = mediaItem.src;
+                modalVideo.style.display = "block";
+                modalImg.style.display = "none";
+                modalVideo.load();
+                modalVideo.play();
+            }
+        }
+
+        function showNextMedia() {
+            if (playableMediaItems.length === 0) return;
+            currentMediaIndex = (currentMediaIndex + 1) % playableMediaItems.length;
+            showMedia(playableMediaItems[currentMediaIndex]);
+            resetAutoplay(); // Next/Prev par click karne par autoplay reset karein
+        }
+
+        function showPrevMedia() {
+            if (playableMediaItems.length === 0) return;
+            currentMediaIndex = (currentMediaIndex - 1 + playableMediaItems.length) % playableMediaItems.length;
+            showMedia(playableMediaItems[currentMediaIndex]);
+            resetAutoplay(); // Next/Prev par click karne par autoplay reset karein
+        }
+
+        function toggleAutoplay() {
+            if (autoplayInterval) {
+                stopAutoplay();
+            } else {
+                startAutoplay();
+            }
+        }
+
+        function startAutoplay() {
+            if (playableMediaItems.length <= 1) return; // Autoplay ke liye kam se kam 2 items chahiye
+            if (autoplayInterval) stopAutoplay(); // Existing interval ko clear karein
+
+            autoplayInterval = setInterval(showNextMedia, AUTOPLAY_DELAY);
+            autoplayBtn.classList.add('autoplay-active');
+            autoplayBtn.innerHTML = '<i class="fas fa-pause"></i> Autoplay';
+        }
+
+        function stopAutoplay() {
+            clearInterval(autoplayInterval);
+            autoplayInterval = null;
+            autoplayBtn.classList.remove('autoplay-active');
+            autoplayBtn.innerHTML = '<i class="fas fa-play"></i> Autoplay';
+        }
+
+        function resetAutoplay() {
+            if (autoplayInterval) { // Agar autoplay active hai, toh use reset karein
+                stopAutoplay();
+                startAutoplay();
+            }
+        }
+
+        function closeModal() {
+            modal.style.display = "none";
+            modalImg.style.display = "none";
+            modalVideo.style.display = "none";
+            modalVideo.pause();
+            modalVideo.currentTime = 0;
+            stopAutoplay(); // Modal band karte waqt autoplay band karein
+        }
+
+        // Close modal when clicking outside of the content
+        modal.onclick = function(event) {
+            // Check if the click was directly on the modal background, not on controls or content
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Close modal with Escape key
+        document.onkeydown = function(e) {
+            e = e || window.event;
+            if (e.key === "Escape") {
+                closeModal();
+            } else if (modal.style.display === "flex") { // Agar modal khula hai
+                if (e.key === "ArrowRight") {
+                    showNextMedia();
+                } else if (e.key === "ArrowLeft") {
+                    showPrevMedia();
+                }
+            }
+        };
+
+        // Mobile ke liye Swipe Gestures
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const minSwipeDistance = 50; // Valid swipe ke liye minimum pixels
+
+        modal.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        modal.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].clientX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            const swipeDistance = touchEndX - touchStartX;
+            if (swipeDistance > minSwipeDistance) {
+                // Right swipe (previous)
+                showPrevMedia();
+            } else if (swipeDistance < -minSwipeDistance) {
+                // Left swipe (next)
+                showNextMedia();
+            }
+        }
+    </script>
+</body>
+</html>
